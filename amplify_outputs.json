@@ -1,0 +1,126 @@
+{
+  "auth": {
+    "user_pool_id": "us-east-2_6L23Phzl2",
+    "aws_region": "us-east-2",
+    "user_pool_client_id": "ogv5cavllk2e3r2fncpcvheic",
+    "identity_pool_id": "us-east-2:229d9923-87d5-40f1-a2a3-2693c367ac7a",
+    "mfa_methods": [],
+    "standard_required_attributes": [
+      "email"
+    ],
+    "username_attributes": [
+      "email"
+    ],
+    "user_verification_types": [
+      "email"
+    ],
+    "mfa_configuration": "NONE",
+    "password_policy": {
+      "min_length": 8,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_symbols": true,
+      "require_uppercase": true
+    },
+    "oauth": {
+      "identity_providers": [
+        "GOOGLE"
+      ],
+      "redirect_sign_in_uri": [
+        "http://localhost:3000/",
+        "https://www.tinywins.ai/",
+        "https://tinywins-dev.d3brd080icmk8j.amplifyapp.com/",
+        "tinywinsmobile://callback",
+        "https://auth.expo.io/@anonymous/tinywins-mobile"
+      ],
+      "redirect_sign_out_uri": [
+        "http://localhost:3000/",
+        "https://www.tinywins.ai/",
+        "https://tinywins-dev.d3brd080icmk8j.amplifyapp.com/",
+        "tinywinsmobile://callback"
+      ],
+      "response_type": "code",
+      "scopes": [
+        "phone",
+        "email",
+        "openid",
+        "profile",
+        "aws.cognito.signin.user.admin"
+      ],
+      "domain": "94ecad802bbb0c7a4fc4.auth.us-east-2.amazoncognito.com"
+    },
+    "unauthenticated_identities_enabled": true
+  },
+  "data": {
+    "url": "https://ioplijwclvbq3ogrc7owelmsme.appsync-api.us-east-2.amazonaws.com/graphql",
+    "aws_region": "us-east-2",
+    "api_key": "da2-wy7eueevn5ghfexh6euqy3fsla",
+    "default_authorization_type": "AMAZON_COGNITO_USER_POOLS",
+    "authorization_types": [
+      "API_KEY",
+      "AWS_IAM"
+    ]
+  },
+  "storage": {
+    "aws_region": "us-east-2",
+    "bucket_name": "amplify-d1vmx4qhf14eow-ti-blogimagesbucketaedaf0e1-auiqdcz6mulk",
+    "buckets": [
+      {
+        "name": "blogimages",
+        "bucket_name": "amplify-d1vmx4qhf14eow-ti-blogimagesbucketaedaf0e1-auiqdcz6mulk",
+        "aws_region": "us-east-2",
+        "paths": {
+          "blog-images/*": {
+            "authenticated": [
+              "get",
+              "list",
+              "write"
+            ],
+            "guest": [
+              "get",
+              "list"
+            ]
+          },
+          "provider-credentials/*": {
+            "authenticated": [
+              "get",
+              "list",
+              "write"
+            ]
+          },
+          "notes-files/*": {
+            "authenticated": [
+              "get",
+              "list",
+              "write"
+            ],
+            "guest": [
+              "get",
+              "list"
+            ]
+          },
+          "public/*": {
+            "authenticated": [
+              "get",
+              "list",
+              "write"
+            ],
+            "guest": [
+              "get",
+              "list"
+            ]
+          },
+          "private/*": {
+            "authenticated": [
+              "get",
+              "list",
+              "write"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "version": "1.3"
+}
+
