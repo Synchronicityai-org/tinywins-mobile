@@ -1,8 +1,17 @@
+import {
+  CognitoAccessToken,
+  CognitoIdToken,
+  CognitoRefreshToken,
+  CognitoUser,
+  CognitoUserPool,
+  CognitoUserSession,
+} from 'amazon-cognito-identity-js';
 import { useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useAuth } from '@/context/AuthContext';
 import * as Linking from 'expo-linking';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import outputs from '../amplify_outputs.json';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * OAuth callback handler for Google sign-in redirects
@@ -17,173 +26,138 @@ export default function CallbackScreen() {
     // Check auth state after OAuth redirect
     const handleCallback = async () => {
       try {
-        // For web, check if we have the code or error in the URL
-        // Note: When using expo.io redirect, the callback might come through expo.io first
+        let code: string | null = null;
+        let error: string | null = null;
+        let errorDescription: string | null = null;
+        let redirectUri: string;
+        
+        // Check for code/error in URL params (from deep link or web)
         if (typeof window !== 'undefined' && window.location) {
+          // Web: get from window.location
           const urlParams = new URLSearchParams(window.location.search);
-          const code = urlParams.get('code');
-          const error = urlParams.get('error');
-          const errorDescription = urlParams.get('error_description');
-          
-          console.log('Callback screen loaded');
-          console.log('Current URL:', window.location.href);
-          console.log('Hostname:', window.location.hostname);
-          console.log('Code:', code ? code.substring(0, 20) + '...' : 'none');
-          console.log('Error:', error || 'none');
-          
-          // Note: If we're on expo.io domain, this component won't run
-          // Expo.io will try to redirect to the mobile app
-          // For web, we need to manually copy the code from the URL and navigate
-          // OR use a browser bookmarklet/extension to redirect
-          
-          // For now, if we somehow get here on expo.io, try to redirect
-          if (window.location.hostname.includes('expo.io')) {
-            console.log('⚠️ On expo.io domain - this component may not run');
-            console.log('Current URL:', window.location.href);
-            if (code) {
-              console.log('Code found, attempting redirect to app...');
-              // Try to redirect to our app
-              try {
-                window.location.href = `http://localhost:8081/callback?code=${encodeURIComponent(code)}`;
-                return;
-              } catch (e) {
-                console.error('Redirect failed:', e);
-                alert('Please copy the code from the URL and navigate to: http://localhost:8081/callback?code=YOUR_CODE');
-              }
+          code = urlParams.get('code');
+          error = urlParams.get('error');
+          errorDescription = urlParams.get('error_description');
+          redirectUri = `${window.location.origin}/callback`;
+        } else {
+          // Mobile: get from route params
+          code = (params.code as string) || null;
+          error = (params.error as string) || null;
+          errorDescription = (params.error_description as string) || null;
+          redirectUri = 'tinywinsmobile://callback';
+        }
+        
+        if (error) {
+          alert(`OAuth error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`);
+          router.replace('/(auth)/login');
+          return;
+        }
+        
+        if (code) {
+          // Exchange code for tokens
+          try {
+            const oauthDomain = outputs.auth.oauth.domain;
+            const clientId = outputs.auth.user_pool_client_id;
+            
+            // Exchange code for tokens
+            const tokenEndpoint = `https://${oauthDomain}/oauth2/token`;
+            const tokenParams = new URLSearchParams({
+              grant_type: 'authorization_code',
+              client_id: clientId,
+              code: code,
+              redirect_uri: redirectUri,
+            });
+            
+            const tokenResponse = await fetch(tokenEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: tokenParams.toString(),
+            });
+            
+            if (!tokenResponse.ok) {
+              const errorText = await tokenResponse.text();
+              throw new Error('Failed to exchange authorization code');
             }
-          }
-          
-          if (error) {
-            console.error('OAuth error in callback:', error, errorDescription);
-            // Show error to user
-            alert(`OAuth error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`);
+            
+            const tokenData = await tokenResponse.json();
+            
+            // Create user pool and session
+            const userPool = new CognitoUserPool({
+              UserPoolId: outputs.auth.user_pool_id,
+              ClientId: clientId,
+            });
+            
+            // Decode ID token to get username
+            const idTokenParts = tokenData.id_token.split('.');
+            let payload = idTokenParts[1];
+            payload = payload.replace(/-/g, '+').replace(/_/g, '/');
+            while (payload.length % 4) {
+              payload += '=';
+            }
+            const tokenPayload = JSON.parse(atob(payload));
+            const username = tokenPayload['cognito:username'] || tokenPayload.email || tokenPayload.sub;
+            
+            const cognitoUser = new CognitoUser({
+              Username: username,
+              Pool: userPool,
+            });
+            
+            const idToken = new CognitoIdToken({ IdToken: tokenData.id_token });
+            const accessToken = new CognitoAccessToken({ AccessToken: tokenData.access_token });
+            const refreshToken = new CognitoRefreshToken({ RefreshToken: tokenData.refresh_token });
+            
+            const session = new CognitoUserSession({
+              IdToken: idToken,
+              AccessToken: accessToken,
+              RefreshToken: refreshToken,
+            });
+            
+            cognitoUser.setSignInUserSession(session);
+            
+            // Store session in Amplify's cache
+            try {
+              const { Cache } = require('@aws-amplify/core');
+              const cacheKey = `CognitoIdentityServiceProvider.${clientId}.${username}.idToken`;
+              const accessTokenKey = `CognitoIdentityServiceProvider.${clientId}.${username}.accessToken`;
+              const refreshTokenKey = `CognitoIdentityServiceProvider.${clientId}.${username}.refreshToken`;
+              
+              await Cache.setItem(cacheKey, tokenData.id_token);
+              await Cache.setItem(accessTokenKey, tokenData.access_token);
+              await Cache.setItem(refreshTokenKey, tokenData.refresh_token);
+            } catch (cacheError) {
+              // Continue - session is set on user object
+            }
+            
+            // Update auth context state
+            await checkAuthState();
+            
+            // Navigate to main app
+            setTimeout(() => {
+              router.replace('/(tabs)');
+            }, 500);
+            return; // Exit early since we handled everything
+          } catch (tokenError: any) {
+            const errorMsg = tokenError?.message || 'Failed to complete sign-in';
+            alert(`Error: ${errorMsg}. Please try again.`);
             router.replace('/(auth)/login');
             return;
-          }
-          
-          if (code) {
-            console.log('OAuth code received in callback URL, exchanging for tokens...');
-            // For web, we need to manually exchange the code for tokens
-            try {
-              // Use the expo.io redirect URI that was used in the OAuth request
-              const expoRedirectUri = outputs.auth.oauth.redirect_sign_in_uri.find((uri: string) => 
-                uri.includes('expo.io')
-              );
-              const redirectUri = expoRedirectUri || 'https://auth.expo.io/@anonymous/tinywins-mobile';
-              console.log('Using redirect URI for token exchange:', redirectUri);
-              const oauthDomain = outputs.auth.oauth.domain;
-              const clientId = outputs.auth.user_pool_client_id;
-              
-              // Exchange code for tokens
-              const tokenEndpoint = `https://${oauthDomain}/oauth2/token`;
-              const tokenParams = new URLSearchParams({
-                grant_type: 'authorization_code',
-                client_id: clientId,
-                code: code,
-                redirect_uri: redirectUri,
-              });
-              
-              const tokenResponse = await fetch(tokenEndpoint, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: tokenParams.toString(),
-              });
-              
-              if (!tokenResponse.ok) {
-                const errorText = await tokenResponse.text();
-                console.error('Token exchange failed:', errorText);
-                throw new Error('Failed to exchange authorization code');
-              }
-              
-              const tokenData = await tokenResponse.json();
-              console.log('Tokens received successfully');
-              
-              // Create user pool and session
-              const userPool = new CognitoUserPool({
-                UserPoolId: outputs.auth.user_pool_id,
-                ClientId: clientId,
-              });
-              
-              // Decode ID token to get username
-              const idTokenParts = tokenData.id_token.split('.');
-              let payload = idTokenParts[1];
-              payload = payload.replace(/-/g, '+').replace(/_/g, '/');
-              while (payload.length % 4) {
-                payload += '=';
-              }
-              const tokenPayload = JSON.parse(atob(payload));
-              const username = tokenPayload['cognito:username'] || tokenPayload.email || tokenPayload.sub;
-              
-              const cognitoUser = new CognitoUser({
-                Username: username,
-                Pool: userPool,
-              });
-              
-              const idToken = new CognitoIdToken({ IdToken: tokenData.id_token });
-              const accessToken = new CognitoAccessToken({ AccessToken: tokenData.access_token });
-              const refreshToken = new CognitoRefreshToken({ RefreshToken: tokenData.refresh_token });
-              
-              const session = new CognitoUserSession({
-                IdToken: idToken,
-                AccessToken: accessToken,
-                RefreshToken: refreshToken,
-              });
-              
-              cognitoUser.setSignInUserSession(session);
-              
-              // Store session in Amplify's cache
-              try {
-                const { Cache } = require('@aws-amplify/core');
-                const cacheKey = `CognitoIdentityServiceProvider.${clientId}.${username}.idToken`;
-                const accessTokenKey = `CognitoIdentityServiceProvider.${clientId}.${username}.accessToken`;
-                const refreshTokenKey = `CognitoIdentityServiceProvider.${clientId}.${username}.refreshToken`;
-                
-                await Cache.setItem(cacheKey, tokenData.id_token);
-                await Cache.setItem(accessTokenKey, tokenData.access_token);
-                await Cache.setItem(refreshTokenKey, tokenData.refresh_token);
-              } catch (cacheError) {
-                console.warn('Failed to store session in cache:', cacheError);
-              }
-              
-              console.log('Token exchange and session setup successful');
-              
-              // Update auth context state
-              // We need to trigger a re-check of auth state
-              await checkAuthState();
-              
-              // Navigate to main app
-              setTimeout(() => {
-                router.replace('/(tabs)');
-              }, 500);
-              return; // Exit early since we handled everything
-            } catch (tokenError: any) {
-              console.error('Error exchanging code for tokens:', tokenError);
-              const errorMsg = tokenError?.message || 'Failed to complete sign-in';
-              alert(`Error: ${errorMsg}. Please try again.`);
-              router.replace('/(auth)/login');
-              return;
-            }
-          } else {
-            console.log('No code in callback URL, checking auth state anyway');
           }
         }
         
         // If we get here, either no code or not on web - just check auth state
         await checkAuthState();
-        // Small delay to ensure auth state is updated
         setTimeout(() => {
           router.replace('/(tabs)');
         }, 500);
       } catch (error) {
-        console.error('Error handling OAuth callback:', error);
         router.replace('/(auth)/login');
       }
     };
 
     handleCallback();
-  }, []);
+  }, [params]);
 
   return (
     <View style={styles.container}>
