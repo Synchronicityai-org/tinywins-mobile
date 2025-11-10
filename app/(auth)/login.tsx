@@ -26,11 +26,20 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await signIn(email, password);
-      router.replace('/(tabs)');
+      console.log('Login: Calling signIn with email:', email.trim());
+      const user = await signIn(email.trim(), password);
+      console.log('Login: Sign in successful, user:', user);
+      
+      // Wait a bit for state to update, then navigate
+      // The _layout.tsx should handle navigation automatically, but we'll also do it here as backup
+      setTimeout(() => {
+        console.log('Login: Navigating to tabs...');
+        router.replace('/(tabs)');
+      }, 500);
     } catch (error: any) {
-      Alert.alert('Sign In Error', error.message || 'Failed to sign in');
-    } finally {
+      console.error('Login error:', error);
+      const errorMessage = error?.message || error?.toString() || 'Failed to sign in';
+      Alert.alert('Sign In Error', errorMessage);
       setIsLoading(false);
     }
   };
@@ -38,10 +47,18 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
+      console.log('Starting Google sign-in...');
       await signInWithGoogle();
+      console.log('Google sign-in successful, navigation will happen automatically');
       // Navigation will be handled by the auth state change in _layout.tsx
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 500);
     } catch (error: any) {
-      Alert.alert('Google Sign In Error', error.message || 'Failed to sign in with Google');
+      console.error('Google sign-in error:', error);
+      const errorMessage = error?.message || error?.toString() || 'Failed to sign in with Google';
+      Alert.alert('Google Sign In Error', errorMessage);
       setIsLoading(false);
     }
   };

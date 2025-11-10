@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting...</title>
+    <script>
+        // Extract code from URL and redirect to app
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+            
+            if (error) {
+                // Redirect to login with error
+                window.location.href = 'http://localhost:8081/login?error=' + encodeURIComponent(error);
+            } else if (code) {
+                // Redirect to app callback with code
+                window.location.href = 'http://localhost:8081/callback?code=' + encodeURIComponent(code);
+            } else {
+                // No code or error, go to login
+                window.location.href = 'http://localhost:8081/login';
+            }
+        })();
+    </script>
+</head>
+<body>
+    <p>Redirecting...</p>
+</body>
+</html>
+

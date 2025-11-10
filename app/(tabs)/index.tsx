@@ -26,7 +26,7 @@ export default function HomeScreen() {
         {user && (
           <View style={styles.userInfo}>
             <Text style={styles.userText}>
-              Signed in as: {user.getUsername()}
+              Signed in as: {'username' in user ? user.username : (user as any)?.getUsername?.() || 'User'}
             </Text>
           </View>
         )}

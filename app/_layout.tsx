@@ -22,18 +22,34 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) {
+      console.log('Navigation: Still loading auth state...');
+      return;
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
+
+    console.log('Navigation check:', {
+      isAuthenticated,
+      isLoading,
+      inAuthGroup,
+      inTabsGroup,
+      segments: segments[0],
+    });
 
     if (!isAuthenticated && !inAuthGroup) {
       // Redirect to login if not authenticated
+      console.log('Navigation: Not authenticated, redirecting to login');
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to main app if authenticated
+      // Redirect to main app if authenticated and on auth screen
+      console.log('Navigation: Authenticated, redirecting to tabs');
       router.replace('/(tabs)');
+    } else {
+      console.log('Navigation: Already on correct screen');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, router]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
