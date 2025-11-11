@@ -141,9 +141,7 @@ export interface UserResponse extends BaseModel {
   kidProfileId?: string;
   questionId?: string;
   answer?: string;
-  score?: number; // Score for this answer (0-100 or based on question scoring)
   timestamp?: string;
-  assessmentId?: string; // Link to assessment/questionnaire session
 }
 
 // Question Bank Model
@@ -151,28 +149,6 @@ export interface QuestionBank extends BaseModel {
   question_text?: string;
   category?: QuestionBankCategory;
   options?: string[];
-  scoring?: QuestionScoring; // Scoring configuration for this question
-}
-
-// Question Scoring Configuration
-export interface QuestionScoring {
-  type?: 'binary' | 'scale' | 'weighted'; // Type of scoring
-  maxScore?: number; // Maximum score for this question
-  scoreMap?: Record<string, number>; // Map of answer values to scores (e.g., {"Yes": 10, "No": 0})
-  weight?: number; // Weight of this question in overall assessment
-}
-
-// Assessment Model - Tracks questionnaire/assessment sessions
-export interface Assessment extends BaseModel {
-  kidProfileId: string;
-  type?: 'ANAYA' | 'COMPREHENSIVE' | 'CUSTOM'; // Type of assessment
-  status?: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
-  startedAt?: string;
-  completedAt?: string;
-  totalScore?: number; // Overall score for the assessment
-  maxScore?: number; // Maximum possible score
-  summaryReport?: string; // Generated summary report
-  responses?: UserResponse[]; // All responses for this assessment
 }
 
 // Parent Concerns Model
@@ -180,7 +156,6 @@ export interface ParentConcerns extends BaseModel {
   kidProfileId: string;
   concernText: string;
   timestamp: string;
-  assessmentId: string;
 }
 
 // Blog Post Model
