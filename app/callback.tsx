@@ -7,6 +7,7 @@ import {
   CognitoUserSession,
 } from 'amazon-cognito-identity-js';
 import { useEffect } from 'react';
+import React from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -21,8 +22,14 @@ export default function CallbackScreen() {
   const router = useRouter();
   const { checkAuthState } = useAuth();
   const params = useLocalSearchParams();
+  const [hasProcessed, setHasProcessed] = React.useState(false);
 
   useEffect(() => {
+    // Prevent duplicate processing
+    if (hasProcessed) {
+      return;
+    }
+
     // Check auth state after OAuth redirect
     const handleCallback = async () => {
       try {
@@ -38,7 +45,10 @@ export default function CallbackScreen() {
           code = urlParams.get('code');
           error = urlParams.get('error');
           errorDescription = urlParams.get('error_description');
-          redirectUri = `${window.location.origin}/callback`;
+          // Construct redirect URI - must match exactly what was used in authorization request
+          // Remove any trailing slashes and ensure consistent format
+          const origin = window.location.origin.replace(/\/$/, '');
+          redirectUri = `${origin}/callback`;
         } else {
           // Mobile: get from route params
           code = (params.code as string) || null;
@@ -54,6 +64,9 @@ export default function CallbackScreen() {
         }
         
         if (code) {
+          // Mark as processed to prevent duplicate exchanges
+          setHasProcessed(true);
+          
           // Exchange code for tokens
           try {
             const oauthDomain = outputs.auth.oauth.domain;
@@ -78,7 +91,15 @@ export default function CallbackScreen() {
             
             if (!tokenResponse.ok) {
               const errorText = await tokenResponse.text();
-              throw new Error('Failed to exchange authorization code');
+              let errorMessage = 'Failed to exchange authorization code for tokens';
+              try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error_description || errorJson.error || errorMessage;
+              } catch {
+                // Not JSON, use error text as-is
+                errorMessage = errorText || errorMessage;
+              }
+              throw new Error(errorMessage);
             }
             
             const tokenData = await tokenResponse.json();

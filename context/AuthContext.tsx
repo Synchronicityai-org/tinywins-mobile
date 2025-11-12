@@ -189,8 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (isWeb) {
         // Web platform: use current origin + /callback
+        // Must match exactly what callback screen will use
         if (typeof window !== 'undefined' && window.location) {
-          redirectUri = `${window.location.origin}/callback`;
+          // Remove any trailing slashes and ensure consistent format
+          const origin = window.location.origin.replace(/\/$/, '');
+          redirectUri = `${origin}/callback`;
         } else {
           redirectUri = 'http://localhost:8081/callback';
         }
@@ -305,7 +308,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.error_description || errorJson.error || errorMessage;
         } catch {
-          // Not JSON, use default message
+          // Not JSON, use error text as-is
+          errorMessage = errorText || errorMessage;
         }
         throw new Error(errorMessage);
       }
